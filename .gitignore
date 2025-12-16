@@ -1,0 +1,6 @@
+/target
+.cargo
+**/Cargo.lock
+/logs
+/app/logs
+.env

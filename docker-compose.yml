@@ -1,0 +1,78 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+      MYSQL_DATABASE: c_oauth2
+      MYSQL_USER: app
+      MYSQL_PASSWORD: apppass
+    ports:
+      - "3307:3306"               # host 3307 -> container 3306
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pexample"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.0-alpine
+    ports:
+      - "6379:6379"               # host 6379 -> container 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrator:
+    image: debian:bookworm-slim
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    user: "root"
+    volumes:
+      - ./db/migrations:/migrations:ro
+      - ./db/seeds:/seeds:ro
+    entrypoint: ["/bin/sh", "-lc"]
+    command: >
+      set -euo pipefail &&
+      apt-get update &&
+      apt-get install -y --no-install-recommends ca-certificates curl default-mysql-client xz-utils &&
+      update-ca-certificates &&
+      arch="$$(uname -m)" &&
+      if [ "$$arch" = "x86_64" ]; then url="https://github.com/launchbadge/sqlx/releases/download/sqlx-cli-0.7.4/sqlx-cli-x86_64-unknown-linux-gnu.tar.xz"; else url="https://github.com/launchbadge/sqlx/releases/download/sqlx-cli-0.7.4/sqlx-cli-aarch64-unknown-linux-gnu.tar.xz"; fi &&
+      echo "Downloading $$url" &&
+      curl -fsSL -H "Accept: application/octet-stream" -o /tmp/sqlx.tar.xz "$$url" &&
+      ls -lh /tmp/sqlx.tar.xz &&
+      tar -xJf /tmp/sqlx.tar.xz -C /tmp &&
+      mv /tmp/sqlx /usr/local/bin/sqlx &&
+      export DATABASE_URL='mysql://root:example@db:3306/c_oauth2' &&
+      sqlx migrate run --source /migrations &&
+      for f in /seeds/*.sql; do
+        echo "Seeding $$f";
+        mysql -h db -P 3306 -u root -pexample c_oauth2 < "$$f";
+      done
+
+  server:
+    build: .
+    image: c-oauth2-server
+    environment:
+      DATABASE_URL: mysql://app:apppass@db:3306/c_oauth2
+      REDIS_URL: redis://redis:6379
+      RUST_LOG: info
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+volumes:
+  dbdata:
