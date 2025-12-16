@@ -4,16 +4,15 @@ ARG RUST_VERSION=1.91
 FROM rust:${RUST_VERSION} AS build
 WORKDIR /app
 
-COPY .cargo /app/.cargo
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 
 # Online sqlx macros: point to a reachable DB from the build container.
 # On macOS, host.docker.internal maps to your host; use the host port you exposed (e.g., 3307).
-ENV DATABASE_URL="mysql://root:example@host.docker.internal:3307/c_oauth2"
+ENV DATABASE_URL="mysql://root:example@host.docker.internal:3307/loom"
 
 RUN cargo build --locked --release
-RUN install -Dm755 ./target/release/c-oauth2 /bin/server
+RUN install -Dm755 ./target/release/loom /bin/server
 
 FROM debian:bookworm-slim AS final
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*

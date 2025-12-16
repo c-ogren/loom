@@ -3,7 +3,7 @@ services:
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: example
-      MYSQL_DATABASE: c_oauth2
+      MYSQL_DATABASE: loom
       MYSQL_USER: app
       MYSQL_PASSWORD: apppass
     ports:
@@ -50,18 +50,18 @@ services:
       ls -lh /tmp/sqlx.tar.xz &&
       tar -xJf /tmp/sqlx.tar.xz -C /tmp &&
       mv /tmp/sqlx /usr/local/bin/sqlx &&
-      export DATABASE_URL='mysql://root:example@db:3306/c_oauth2' &&
+      export DATABASE_URL='mysql://root:example@db:3306/loom' &&
       sqlx migrate run --source /migrations &&
       for f in /seeds/*.sql; do
         echo "Seeding $$f";
-        mysql -h db -P 3306 -u root -pexample c_oauth2 < "$$f";
+        mysql -h db -P 3306 -u root -pexample loom < "$$f";
       done
 
   server:
     build: .
-    image: c-oauth2-server
+    image: loom-server
     environment:
-      DATABASE_URL: mysql://app:apppass@db:3306/c_oauth2
+      DATABASE_URL: mysql://app:apppass@db:3306/loom
       REDIS_URL: redis://redis:6379
       RUST_LOG: info
     depends_on:
